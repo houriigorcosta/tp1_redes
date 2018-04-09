@@ -10,13 +10,9 @@ host = '127.0.0.1'
 port =  55555
 sync="{:032b}".format(0xDCC023C2)
 
-
-def carry_around_add(a, b):
-    c = a + b
-    return(c &0xffff) + (c>>16)
-
 def encode(number):
 	return "{:X}".format(number)
+
 def decode(number):
 	hex_int = int(number, 16)
 	return hex_int
@@ -26,13 +22,6 @@ def twos_comp(val, bits):
 	if (val & (1 << (bits - 1))) != 0: # if sign bit is set e.g., 8bit: 128-255
 		val = val - (1 << bits)        # compute negative value
 	return val  
-
-
-def obtem_xor(soma,s):
-	if (2**s-1>soma):
-		return 2**s-1
-	else:
-		return obtem_xor(soma,s+1) 
 
 def checksum_maker(msg):
 	chunks, chunk_size = len(msg), 8
@@ -62,10 +51,10 @@ s.settimeout(15.0)
 #host = socket.gethostbyname(host)							
 #s.connect((host, port))
 #msg=encode(msg)
-msg_sem_chk = "{}{}{:016b}{:08b}{:08b}{}".format(sync,sync,len(msg),0,0,msg)
+msg_sem_chk = "{}{}{:016b}{:08b}{:08b}{}".format(sync,sync,len(msg),1,1,msg)
 chk=checksum_maker(msg_sem_chk)
 print("{}".format(chk))
-msg_com_chk = "{}{}{:016b}{:016b}{:08b}{:08b}{}".format(sync,sync,len(msg),chk,0,0,msg)
+msg_com_chk = "{}{}{:016b}{:016b}{:08b}{:08b}{}".format(sync,sync,len(msg),chk,1,1,msg)
 
 msg_sem_chk_nova,chk_novo=extrai_msg_sem_chk(msg_com_chk)
 
@@ -73,7 +62,7 @@ print(msg_sem_chk)
 print(msg_sem_chk_nova)
 print((msg_sem_chk_nova == msg_sem_chk))
 print(chk == chk_novo)
-print (checksum_compare( msg_sem_chk_nova,chk_novo)+1%2**16)
+print (checksum_compare( msg_sem_chk_nova,chk_novo))
 
 #s.send(msg.encode())
 #s.close()							
