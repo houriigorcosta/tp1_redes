@@ -8,7 +8,8 @@ import functools
 from base64 import b16encode, b16decode
 import binascii
 
-BUFFER_LEN=1024
+
+BUFFER_LEN=65000
 host = '127.0.0.1'
 port =  55555
 sync="{:032b}".format(0xDCC023C2)
@@ -26,7 +27,16 @@ def checksum_maker(msg):
 	chunks, chunk_size = len(msg), 8
 	msg = [ msg[i:i+chunk_size] for i in range(0, chunks, chunk_size) ]
 	#print (msg)
-	soma = sum([int(h,2) for h in msg]) % (2**16)
+	soma=0
+	for h in msg:
+		#print (h)
+		try:
+			soma+=int(h,2)%(2**16)
+		except:
+			print(h)
+			exit(-1)
+
+	#soma = sum([int(h,2) for h in msg]) % (2**16)
 	#print ("soma: {} {:016b}".format(soma,soma))
 	soma = (soma ^ 0xFFFF) % (2**16)
 	#print ("soma2: {} {:016b}".format(soma,soma))
@@ -41,7 +51,7 @@ def checksum_compare(msg,chk):
 	return soma
 
 def extrai_msg_sem_chk(msg_com_chk):
-	return 	msg_com_chk[0:80]+msg_com_chk[96:len(msg_com_chk)], int(msg_com_chk[80:96],2)
+	return 	msg_com_chk[0:80]+msg_com_chk[96:len(msg_com_chk)], int(msg_com_chk[80:96] or '0',2)
 
 ack_id1 = "{}{}{:016b}{:08b}{:08b}".format(sync,sync,0,1,0x80)
 chk_ack_id1=checksum_maker(ack_id1)
@@ -74,7 +84,7 @@ if len(sys.argv)==4:
 			msg_decodificada = msg_decodificada.decode()
 			msg_sem_chk_nova, chk_novo=extrai_msg_sem_chk(msg_decodificada)
 			checksum_flag = checksum_compare( msg_sem_chk_nova,chk_novo)
-			print ("Mensagem decodificada:\n {}\nchecksum:{} e flag_checksum:{}".format(msg_decodificada,chk_novo,checksum_flag))
+			#print ("Mensagem decodificada:\n {}\nchecksum:{} e flag_checksum:{}".format(msg_decodificada,chk_novo,checksum_flag))
 			if checksum_flag == checksum_true:
 				sync_msg01=msg_decodificada[0:32]
 				sync_msg02=msg_decodificada[32:64]
@@ -82,7 +92,8 @@ if len(sys.argv)==4:
 				chksum=msg_decodificada[80:96]
 				id_msg=int(msg_decodificada[96:104],2)
 				flag=int(msg_decodificada[104:112],2)
-				print("dados {}".format(msg_decodificada[112:]))
+				#print("dados {}".format(msg_decodificada[112:]))
+				dados=int(msg_decodificada[112:],2)
 				try:
 					dados=int(msg_decodificada[112:],2)
 					dados=binascii.unhexlify('%x' % dados)
@@ -112,11 +123,9 @@ if len(sys.argv)==4:
 			ack=c.recv(BUFFER_LEN)
 			ack=b16decode(ack).decode()
 			if (id_tx%2==1 and ack==ack_id1) or (id_tx%2==0 and ack==ack_id0):
-				print("mensgem recebida com sucesso")
+				print("mensagem recebida com sucesso {}".format(id_tx))
 			else:
-				print (id_tx%2)
-				print (ack)
-				print(ack_id0)
+				print("mensagem recebida sem sucesso {}\n{}\n{}".format(id_tx,ack,ack_id0))
 			id_tx+=1		
 
 
@@ -156,11 +165,9 @@ elif len(sys.argv)==5:
 			ack=s.recv(BUFFER_LEN)
 			ack=b16decode(ack).decode()
 			if (id_tx%2==1 and ack==ack_id1) or (id_tx%2==0 and ack==ack_id0):
-				print("mensgem recebida com sucesso")
+				print("mensagem recebida com sucesso {}".format(id_tx))
 			else:
-				print (id_tx%2)
-				print (ack)
-				print(ack_id0)
+				print("mensagem recebida sem sucesso {}\n{}\n{}".format(id_tx,ack,ack_id0))
 			id_tx+=1		
 		
 
@@ -171,7 +178,7 @@ elif len(sys.argv)==5:
 			msg_decodificada = msg_decodificada.decode()
 			msg_sem_chk_nova, chk_novo=extrai_msg_sem_chk(msg_decodificada)
 			checksum_flag = checksum_compare( msg_sem_chk_nova,chk_novo)
-			print ("Mensagem decodificada:\n {}\nchecksum:{} e flag_checksum:{}".format(msg_decodificada,chk_novo,checksum_flag))
+			#print ("Mensagem decodificada:\n {}\nchecksum:{} e flag_checksum:{}".format(msg_decodificada,chk_novo,checksum_flag))
 			if checksum_flag == checksum_true:
 				sync_msg01=msg_decodificada[0:32]
 				sync_msg02=msg_decodificada[32:64]
@@ -179,6 +186,7 @@ elif len(sys.argv)==5:
 				chksum=msg_decodificada[80:96]
 				id_msg=int(msg_decodificada[96:104],2)
 				flag=int(msg_decodificada[104:112],2)
+				dados=int(msg_decodificada[112:],2)
 				try:
 					dados=int(msg_decodificada[112:],2)
 					dados=binascii.unhexlify('%x' % dados)

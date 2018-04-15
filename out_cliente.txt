@@ -1,5 +1,5 @@
-Hi! This file has 5 lines.
-The 3rd line is intentionally left blank.
+Project Gutenberg's Alice's Adventures in Wonderland, by Lewis Carroll
 
-However, the 4th one has few words.
-We end up here. Bye!
+This eBook is for the use of anyone anywhere at no cost and with
+almost no restrictions whatsoever.  You may copy it, give it away or
+re-use it under the terms of the Project Gutenberg License included
