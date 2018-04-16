@@ -9,14 +9,15 @@ from base64 import b16encode, b16decode
 import binascii
 
 
-BUFFER_LEN=65000
+BUFFER_LEN = 65000
 host = '127.0.0.1'
 port =  55555
 sync_int = 0xDCC023C2
 sync="{:032b}".format(sync_int)
 checksum_true = 2**16-1
-TAMANHO_PEDACOS=100
-TIMEOUT=15.0
+TAMANHO_PEDACOS = 1024
+TIMEOUT = 15.0
+DEBUG = False
 
 def make_checksum(sync,id_,flag,msg):
 	checksum=(sync+sync+len(msg)+id_+flag+sum(msg))%(2**16)
@@ -33,15 +34,20 @@ def compare_checksum(sync,id_,flag,msg,chk):
 
 
 chk_ack0=make_checksum(sync_int,0,0x80,[0])
-ack0="{:08X}{:08X}{:04X}{:04X}{:02X}{:02X}".format(sync_int,sync_int,0,chk_ack0,0,0x80)
+ack0="{:08X}{:08X}{:04X}{:04X}{:02X}{:02X}".format(sync_int,sync_int,0,chk_ack0,0,0x80).encode()
 chk_ack1=make_checksum(sync_int,1,0x80,[0])
-ack1="{:08X}{:08X}{:04X}{:04X}{:02X}{:02X}".format(sync_int,sync_int,0,chk_ack1,1,0x80)
+ack1="{:08X}{:08X}{:04X}{:04X}{:02X}{:02X}".format(sync_int,sync_int,0,chk_ack1,1,0x80).encode()
+chk_fim0=make_checksum(sync_int,0,0x70,[0])
+fim0="{:08X}{:08X}{:04X}{:04X}{:02X}{:02X}".format(sync_int,sync_int,0,chk_fim0,0,0x70).encode()
+chk_fim1=make_checksum(sync_int,1,0x70,[0])
+fim1="{:08X}{:08X}{:04X}{:04X}{:02X}{:02X}".format(sync_int,sync_int,0,chk_fim1,1,0x70).encode()
 
 def recebe_pacote(c,file_out):
 	pacote=c.recv(BUFFER_LEN)
 	pacote=b16decode(pacote)
-	if pacote!=b'':
-		print(pacote)
+	if pacote!=b'' and pacote!=fim1 and pacote!=fim0:
+		if DEBUG:
+			print(pacote)
 		sync_msg01=int(pacote[0:8],16)
 		sync_msg02=int(pacote[8:16],16)
 		length=int(pacote[16:20],16)
@@ -50,29 +56,51 @@ def recebe_pacote(c,file_out):
 		flag=int(pacote[26:28],16)
 		dados=pacote[28:28+length]
 		chk_flag = (compare_checksum(sync_msg01,id_msg,flag,dados,chksum)==checksum_true)
-		print("sync_msg01 {:X}\nsync_msg02 {:X}\nlength {}\nchksum {}\nid_msg {}\nflag {}\ndados {}\nchksum_flag {}\n".format(sync_msg01,sync_msg02,length,chksum,id_msg,flag,dados,chk_flag))
+		if DEBUG:
+			print("sync_msg01 {:X}\nsync_msg02 {:X}\nlength {}\nchksum {}\nid_msg {}\nflag {}\ndados {}\nchksum_flag {}\n".format(sync_msg01,sync_msg02,length,chksum,id_msg,flag,dados,chk_flag))
 		if chk_flag:
 			if id_msg==0:
-				c.send(b16encode(ack0.encode()))
+				c.send(b16encode(ack0))
 			elif id_msg==1:
-				c.send(b16encode(ack1.encode()))
+				c.send(b16encode(ack1))
 			file_out.write(dados)
+		return False
+	elif pacote==fim1:
+		c.send(b16encode(ack1))
+		return True
+	elif pacote==fim0:
+		c.send(b16encode(ack0))
+		return True
+
 
 def envia_pacote(s,msg_lista,id_tx,pivo):
 	if pivo<len(msg_lista):
 			chk=make_checksum(sync_int,id_tx%2,0,msg_lista[pivo])
 			pacote="{:08X}{:08X}{:04X}{:04X}{:02X}{:02X}".format(sync_int,sync_int,len(msg_lista[pivo]),chk,id_tx%2,0).encode()+msg_lista[pivo]
-			print("chk {}\npacote {}".format(chk,pacote))
+			if DEBUG:
+				print("chk {}\npacote {}".format(chk,pacote))
 			pacote=b16encode(pacote)
 			s.send(pacote)
 			ack=s.recv(BUFFER_LEN)
-			ack=b16decode(ack).decode()
+			ack=b16decode(ack)
 			if (id_tx%2==1 and ack==ack1) or (id_tx%2==0 and ack==ack0):
 				print("mensagem recebida com sucesso {}".format(id_tx))
 				pivo+=1
 				id_tx+=1		
 			else:
 				print("mensagem recebida sem sucesso {}\n{}\n{}\n\n\n".format(id_tx,ack,ack0))
+	else:
+		if id_tx%2==1:
+			s.send(b16encode(fim1))
+		else:
+			s.send(b16encode(fim0))
+		ack=s.recv(BUFFER_LEN)
+		ack=b16decode(ack)
+		if (id_tx%2==1 and ack==ack1) or (id_tx%2==0 and ack==ack0):
+			print("terminou de enviar o arquivo {}".format(id_tx))
+			id_tx+=1		
+		else:
+			print("terminou de enviar o arquivo {}\n{}\n{}\n\n\n".format(id_tx,ack,ack0))
 
 	return (id_tx, pivo)
 
@@ -95,9 +123,10 @@ if len(sys.argv)==4:
 	id_tx=0
 	pivo=0
 	while True:
-		recebe_pacote(c,file_out)
+		terminou = recebe_pacote(c,file_out)
 		id_tx, pivo = envia_pacote(c,msg_lista,id_tx,pivo)
-		
+		#if terminou == True and id_tx>pivo:
+		#	break;
 
 		
 		
@@ -125,6 +154,7 @@ elif len(sys.argv)==5:
 	pivo=0
 	while True:
 		id_tx, pivo = envia_pacote(s,msg_lista,id_tx,pivo)
-		recebe_pacote(s,file_out)
-	
+		terminou = recebe_pacote(s,file_out)
+		#if terminou == True and id_tx>pivo:
+		#	break;	
 	
