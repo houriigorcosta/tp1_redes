@@ -14,6 +14,7 @@ host = '127.0.0.1'
 port =  55555
 sync="{:032b}".format(0xDCC023C2)
 checksum_true = 2**16-1
+TAMANHO_PEDACOS=100
 
 
 
@@ -30,11 +31,12 @@ def checksum_maker(msg):
 	soma=0
 	for h in msg:
 		#print (h)
-		try:
-			soma+=int(h,2)%(2**16)
-		except:
-			print(h)
-			exit(-1)
+		soma+=int(h,16)%(2**16)
+		#try:
+		#	soma+=int(h,2)%(2**16)
+		#except:
+		#	print(h)
+		#	exit(-1)
 
 	#soma = sum([int(h,2) for h in msg]) % (2**16)
 	#print ("soma: {} {:016b}".format(soma,soma))
@@ -46,7 +48,7 @@ def checksum_compare(msg,chk):
 	chunks, chunk_size = len(msg), 8
 	msg = [ msg[i:i+chunk_size] for i in range(0, chunks, chunk_size) ]
 	#print (msg)
-	soma = (sum([int(h,2) for h in msg]) +chk)%(2**16)
+	soma = (sum([int(h,16) for h in msg]) +chk)%(2**16)
 	#print ("soma: {} {:016b}".format(soma,soma))
 	return soma
 
@@ -63,10 +65,12 @@ ack_id0 = "{}{}{:016b}{:016b}{:08b}{:08b}".format(sync,sync,0,chk_ack_id0,0,0x80
 
 if len(sys.argv)==4:
 	print("Servidor")
-	file_in = open(sys.argv[2],'r')
-	file_out = open(sys.argv[3],'w')
-	msg_lista=[i for i in file_in]
-	msg_lista = [bin(int(binascii.hexlify(i.encode()), 16)) for i in msg_lista]
+	#file_in = open(sys.argv[2],'r')
+	file_out = open(sys.argv[3],'wb')
+	file_in = open(sys.argv[2],'rb')
+	f=file_in.read()
+	msg_lista=[ f[i:i+TAMANHO_PEDACOS] for i in range(0, len(f), TAMANHO_PEDACOS) ]
+	file_in.close()
 	port = int(sys.argv[1])
 	s = socket.socket()				#Abre Socket e trata erro de address already in use
 	s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)				
@@ -93,32 +97,29 @@ if len(sys.argv)==4:
 				id_msg=int(msg_decodificada[96:104],2)
 				flag=int(msg_decodificada[104:112],2)
 				#print("dados {}".format(msg_decodificada[112:]))
-				dados=int(msg_decodificada[112:],2)
+				dados=int(msg_decodificada[112:] or '0',2)
 				try:
-					dados=int(msg_decodificada[112:],2)
+					dados=int(msg_decodificada[112:] or '0',2)
 					dados=binascii.unhexlify('%x' % dados)
 				except:
-					dados=chr(int(msg_decodificada[112:],2))	
+					dados=binascii.unhexlify('0%x' % dados)
 
 				print("sync_msg01 {}\nsync_msg02 {}\nlength {}\nchksum {}\nid_msg {}\nflag {}\ndados {}".format(sync_msg01,sync_msg02,length,chksum,id_msg,flag,dados))
 				if id_msg==0:
 					c.send(b16encode(ack_id0.encode()))
 				elif id_msg==1:
 					c.send(b16encode(ack_id1.encode()))
-				if type(dados)!=type("ab"):
-					file_out.write(dados.decode())
-				else:
-					file_out.write(dados)
+				file_out.write(dados)
 				file_out.flush()
 
 		#servidor envia mensagem
 		if pivo<len(msg_lista):	
 			msg=msg_lista[pivo]
 			pivo+=1
-			msg_sem_chk = "{}{}{:016b}{:08b}{:08b}{}".format(sync,sync,len(msg),id_tx%2,0,msg)
+			msg_sem_chk = "{}{}{:016b}{:08b}{:08b}{}".format(sync,sync,len(msg),id_tx%2,0,msg).encode()
 			chk=checksum_maker(msg_sem_chk)
 			print("{}".format(chk))
-			msg_com_chk = "{}{}{:016b}{:016b}{:08b}{:08b}{}".format(sync,sync,len(msg),chk,id_tx%2,0,msg)
+			msg_com_chk = "{}{}{:016b}{:016b}{:08b}{:08b}{}".format(sync,sync,len(msg),chk,id_tx%2,0,msg).encode()
 			c.send(b16encode(msg_com_chk.encode()))
 			ack=c.recv(BUFFER_LEN)
 			ack=b16decode(ack).decode()
@@ -137,11 +138,15 @@ if len(sys.argv)==4:
 
 elif len(sys.argv)==5:
 	print("cliente")
-	file_in = open(sys.argv[3],'r')
-	file_out = open(sys.argv[4],'w')
-	msg_lista=[i for i in file_in]
-	msg_lista = [bin(int(binascii.hexlify(i.encode()), 16)) for i in msg_lista]
+	#file_in = open(sys.argv[3],'r')
+	file_out = open(sys.argv[4],'wb')
+	file_in = open(sys.argv[3],'rb')
+	f=file_in.read()
+	msg_lista=[ f[i:i+TAMANHO_PEDACOS] for i in range(0, len(f), TAMANHO_PEDACOS) ]
 	file_in.close()
+			
+	#msg_lista = [bin(i) for i in msg_lista]
+	#file_in.close()
 
 	host=sys.argv[1]								#obtem o ip do servidor do primeiro argumento
 	port=int(sys.argv[2])							#obtem a porta do segundo arguemento
@@ -157,10 +162,10 @@ elif len(sys.argv)==5:
 		if pivo<len(msg_lista):		
 			msg=msg_lista[pivo]
 			pivo+=1
-			msg_sem_chk = "{}{}{:016b}{:08b}{:08b}{}".format(sync,sync,len(msg),id_tx%2,0,msg)
+			msg_sem_chk = "{}{}{:016b}{:08b}{:08b}{}".format(sync,sync,len(msg),id_tx%2,0,msg).encode()
 			chk=checksum_maker(msg_sem_chk)
 			print("{}".format(chk))
-			msg_com_chk = "{}{}{:016b}{:016b}{:08b}{:08b}{}".format(sync,sync,len(msg),chk,id_tx%2,0,msg)
+			msg_com_chk = "{}{}{:016b}{:016b}{:08b}{:08b}{}".format(sync,sync,len(msg),chk,id_tx%2,0,msg).encode()
 			s.send(b16encode(msg_com_chk.encode()))
 			ack=s.recv(BUFFER_LEN)
 			ack=b16decode(ack).decode()
@@ -186,20 +191,17 @@ elif len(sys.argv)==5:
 				chksum=msg_decodificada[80:96]
 				id_msg=int(msg_decodificada[96:104],2)
 				flag=int(msg_decodificada[104:112],2)
-				dados=int(msg_decodificada[112:],2)
+				dados=int(msg_decodificada[112:] or '0',2)
 				try:
-					dados=int(msg_decodificada[112:],2)
+					dados=int(msg_decodificada[112:] or '0',2)
 					dados=binascii.unhexlify('%x' % dados)
 				except:
-					dados=chr(int(msg_decodificada[112:],2))
+					dados=binascii.unhexlify('0%x' % dados)
 				print("sync_msg01 {}\nsync_msg02 {}\nlength {}\nchksum {}\nid_msg {}\nflag {}\ndados {}".format(sync_msg01,sync_msg02,length,chksum,id_msg,flag,dados))
 				if id_msg==0:
 					s.send(b16encode(ack_id0.encode()))
 				elif id_msg==1:
 					s.send(b16encode(ack_id1.encode()))
-				if type(dados)!=type("ab"):
-					file_out.write(dados.decode())
-				else:
 					file_out.write(dados)
 				file_out.flush()
 
