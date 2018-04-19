@@ -16,7 +16,7 @@ port =  55555
 sync_int = 0xDCC023C2
 sync="{:032b}".format(sync_int)
 checksum_true = 2**16-1
-TAMANHO_PEDACOS = 10
+TAMANHO_PEDACOS = 1024
 TIMEOUT = 0.5#1.0
 DEBUG = False
 
