@@ -20,12 +20,12 @@ TAMANHO_PEDACOS = 1024
 TIMEOUT = 0.5#1.0
 DEBUG = False
 
-def send_modificado(c,msg,p=90.0):
+def send_modificado(c,msg,p=100.0):
 	n = random.uniform(0,100)
 	if n <=p:
 		c.send(msg)
 
-def make_checksum(sync,id_,flag,msg,p=90.0):
+def make_checksum(sync,id_,flag,msg,p=100.0):
 	checksum=(sync+sync+len(msg)+id_+flag+sum(msg))%(2**16)
 	#print("{:016b}".format(checksum))
 	checksum=(checksum^ 0xFFFF)
@@ -116,7 +116,7 @@ def envia_pacote(s,msg_lista,id_tx,pivo):
 					pivo+=1
 					id_tx+=1		
 				else:
-					print("mensagem recebida sem sucesso {}\n{}\n{}\n\n\n".format(id_tx,ack,ack0))
+					print("mensagem recebida sem sucesso {}\n".format(id_tx))
 		else:
 			if id_tx%2==1:
 				send_modificado(s,b16encode(fim1))
@@ -127,10 +127,11 @@ def envia_pacote(s,msg_lista,id_tx,pivo):
 			ack=s.recv(BUFFER_LEN)
 			ack=b16decode(ack)
 			if (id_tx%2==1 and ack==ack1) or (id_tx%2==0 and ack==ack0):
-				print("terminou de enviar o arquivo {}".format(id_tx))
+				if DEBUG:
+					print("terminou de enviar o arquivo {}".format(id_tx))
 				id_tx+=1		
-			else:
-				print("terminou de enviar o arquivo {}\n{}\n{}\n\n\n".format(id_tx,ack,ack0))
+			elif DEBUG:
+				print("terminou de enviar o arquivo {}\n".format(id_tx))
 	except socket.timeout:
 		#print("erro ao receber ACK")
 		pass
