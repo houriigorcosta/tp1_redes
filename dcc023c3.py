@@ -173,19 +173,19 @@ if sys.argv[1]=='-s':				# entra nessa rotina se for emular o servidor
 
 
 
-#python3 dcc023c3.py -c IP PORT INPUT OUTPUT
+#python3 dcc023c3.py -c IP:PORT INPUT OUTPUT
 elif sys.argv[1]=='-c':				# entra nessa rotina se for emular o cliente
 	print("cliente")
 	# faz abertura dos aquivos de entrada e saida
-	file_out=open(sys.argv[5],'wb')
-	file_in=open(sys.argv[4],'rb')
+	file_out=open(sys.argv[4],'wb')
+	file_in=open(sys.argv[3],'rb')
 	f=file_in.read()
 	#print (f)
 	msg_lista=[ f[i:i+TAMANHO_PEDACOS] for i in range(0, len(f), TAMANHO_PEDACOS) ]
 	file_in.close()
 
-	host=sys.argv[2]								#obtem o ip do servidor do primeiro argumento
-	port=int(sys.argv[3])							#obtem a porta do segundo arguemento
+	host,port=sys.argv[2].split(':')				#obtem o ip do servidor do primeiro argumento
+	port=int(port)												#obtem a porta do segundo arguemento
 	s = socket.socket()         					#cria socket para comunicação com o servidor
 	s.settimeout(TIMEOUT)
 	host = socket.gethostbyname(host)				#obtem nome de maquina doip do servidor				
